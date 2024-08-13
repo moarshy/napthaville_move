@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "napthaville_chat"
+version = "0.1.0"
+description = ""
+authors = ["Mohamed Arshath <marshath@gmail.com>"]
+readme = "README.md"
+packages = [
+    {include = "napthaville_move", from ="."}
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pydantic = "^2.8.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

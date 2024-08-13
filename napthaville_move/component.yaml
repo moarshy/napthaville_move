@@ -1,0 +1,13 @@
+name: "napthaville_move"
+author: "naptha"
+version: "0.1.0"
+description: "A module implementation of napthaville move among all personas"
+license: "MIT"
+
+outputs:
+  save: false
+  location: "node"
+
+implementation:
+  package:
+    entrypoint: "run.py"
