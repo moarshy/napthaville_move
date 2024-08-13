@@ -33,8 +33,8 @@ async def run(inputs: InputSchema, worker_nodes = None, orchestrator_node = None
     logger.info(f"Orchestrator node: {orchestrator_node}")
 
     # Make sure the worker nodes are available and it is at least 2
-    if len(worker_nodes) < 2:
-        raise ValueError("There should be at least 2 worker nodes available")
+    if len(worker_nodes) < 1:
+        raise ValueError("There should be at least 1 worker node available")
 
     PERSONA_TO_WORKER = {
         "Isabella Rodriguez": worker_nodes[0],
