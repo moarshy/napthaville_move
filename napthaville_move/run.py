@@ -93,5 +93,7 @@ async def run(inputs: InputSchema, worker_nodes = None, orchestrator_node = None
         response_after_move[persona] = json.loads(response)
 
     logger.info(f"response_after_move: {response_after_move}")  
+
+    return json.dumps(response_after_move)
             
     
