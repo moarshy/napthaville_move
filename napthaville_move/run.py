@@ -223,7 +223,7 @@ async def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: s
     if len(worker_nodes) < 1:
         raise ValueError("There should be at least 1 worker node available")
     
-    num_steps = inputs.get('num_steps', DEFAULT_NUM_STEPS)
+    num_steps = inputs.num_steps
 
     sim_manager = SimulationManager(worker_nodes, orchestrator_node, flow_run, num_steps)
     await sim_manager.init_simulation()

@@ -2,4 +2,4 @@ from pydantic import BaseModel
 
 
 class InputSchema(BaseModel):
-    num_steps: int = 5
+    num_steps: int = 2
