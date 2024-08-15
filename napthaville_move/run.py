@@ -3,7 +3,6 @@ import json
 import uuid
 import shutil
 import logging
-from functools import partial
 import ipfshttpclient
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -98,13 +97,13 @@ class SimulationManager:
 
     def create_task(self, name: str, worker: str) -> NapthaTask:
         """Create a NapthaTask with common parameters."""
-        return partial(NapthaTask(
+        return NapthaTask(
             name=name,
             fn='napthaville_module',
             worker_node=worker,
             orchestrator_node=self.orchestrator_node,
             flow_run=self.flow_run
-        ))
+        )
 
     def run_simulation(self, num_steps: int):
         """Run the simulation for a specified number of steps."""
