@@ -3,6 +3,7 @@ import json
 import uuid
 import shutil
 import logging
+from functools import partial
 import ipfshttpclient
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -82,14 +83,14 @@ class SimulationManager:
         
         for persona in ALL_PERSONAS:
             task = self.create_task("fork_persona", self.persona_to_worker[persona])
-            response = task(
-                    task = 'fork_persona',
-                    task_params = {
-                        'persona_name': persona,
-                        'maze_ipfs_hash': self.maze_ipfs_hash,
-                        'curr_tile': (env[persona]['x'], env[persona]['y'])
-                    }
-            )
+            response = self.run_task(task(
+                task = 'fork_persona',
+                task_params = {
+                    'persona_name': persona,
+                    'maze_ipfs_hash': self.maze_ipfs_hash,
+                    'curr_tile': (env[persona]['x'], env[persona]['y'])
+                }
+            ))
             response_data = json.loads(response)
             self.sims_folders[persona] = response_data['sims_folder']
             self.persona_tiles[persona] = (env[persona]['x'], env[persona]['y'])
@@ -97,13 +98,26 @@ class SimulationManager:
 
     def create_task(self, name: str, worker: str) -> NapthaTask:
         """Create a NapthaTask with common parameters."""
-        return NapthaTask(
+        return partial(NapthaTask(
             name=name,
             fn='napthaville_module',
             worker_node=worker,
             orchestrator_node=self.orchestrator_node,
             flow_run=self.flow_run
-        )
+        ))
+
+    def run_task(self, task_coroutine):
+        """Run a task coroutine and return the result."""
+        try:
+            result = task_coroutine.send(None)
+            while True:
+                try:
+                    result = task_coroutine.send(result)
+                except StopIteration as e:
+                    return e.value
+        except Exception as e:
+            logger.error(f"Error running task: {str(e)}")
+            raise
 
     def run_simulation(self, num_steps: int):
         """Run the simulation for a specified number of steps."""
@@ -131,20 +145,20 @@ class SimulationManager:
     def get_all_persona_scratch(self) -> Dict[str, Dict]:
         """Get scratch data for all personas."""
         return {
-            persona: json.loads(self.create_task("get_scratch", self.persona_to_worker[persona])(
+            persona: json.loads(self.run_task(self.create_task("get_scratch", self.persona_to_worker[persona])(
                 task='get_scratch',
                 task_params={
                     'persona_name': persona,
                     'sims_folder': self.sims_folders[persona]
                 }
-            ))
+            )))
             for persona in ALL_PERSONAS
         }
 
     def get_all_persona_moves(self, personas_scratch: Dict[str, Dict]) -> Dict[str, Dict]:
         moves = {}
         for persona in ALL_PERSONAS:
-            response = self.create_task("get_move", self.persona_to_worker[persona])(
+            response = self.run_task(self.create_task("get_move", self.persona_to_worker[persona])(
                 task = 'get_move',
                 task_params = {
                     'init_persona_name': persona,
@@ -154,7 +168,7 @@ class SimulationManager:
                     'curr_time': self.curr_time.strftime("%B %d, %Y, %H:%M:%S"),
                     'maze_ipfs_hash': self.maze_ipfs_hash
                 }
-            )
+            ))
             moves[persona] = json.loads(response)
             
             # Update maze_ipfs_hash if the worker has updated it
