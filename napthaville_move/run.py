@@ -62,7 +62,6 @@ class SimulationManager:
     async def fork_sims_folder(self) -> str:
         """Create a new simulation folder."""
         new_sims_folder = Path(os.getenv('BASE_OUTPUT_DIR', '')) / str(uuid.uuid4())
-        new_sims_folder.mkdir(parents=True, exist_ok=True)
         shutil.copytree(BASE_SIMS_FOLDER, new_sims_folder)
         return str(new_sims_folder)
 
