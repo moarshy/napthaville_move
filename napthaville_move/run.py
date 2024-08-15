@@ -73,7 +73,7 @@ class SimulationManager:
             meta = json.load(f)
         
         # Set the start_time and curr_time from the meta data
-        self.start_time = datetime.strptime(meta['start_time'], "%B %d, %Y, %H:%M:%S")
+        self.start_time = datetime.strptime(f"{meta['start_date']}, 00:00:00",  "%B %d, %Y, %H:%M:%S")
         self.curr_time = datetime.strptime(meta['curr_time'], "%B %d, %Y, %H:%M:%S")
         self.sec_per_step = meta['sec_per_step']
         
