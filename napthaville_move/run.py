@@ -48,11 +48,11 @@ class SimulationManager:
         return {persona: self.worker_nodes[i % len(self.worker_nodes)] 
                 for i, persona in enumerate(ALL_PERSONAS)}
 
-    def init_simulation(self):
+    async def init_simulation(self):
         """Initialize the simulation environment."""
         self.orchestrator_sims_folder = self.fork_sims_folder()
         env, meta = self.load_initial_state()
-        self.init_workers(env, meta)
+        await self.init_workers(env, meta)
         self.curr_time = datetime.strptime(meta['curr_time'], "%B %d, %Y, %H:%M:%S")
         self.sec_per_step = meta['sec_per_step']
         logger.info("Simulation initialization completed")
@@ -77,20 +77,20 @@ class SimulationManager:
         
         return env, meta
 
-    def init_workers(self, env: Dict, meta: Dict):
+    async def init_workers(self, env: Dict, meta: Dict):
         maze_json = self.maze.to_json()
         self.maze_ipfs_hash = self.upload_maze_json_to_ipfs(maze_json)
         
         for persona in ALL_PERSONAS:
             task = self.create_task("fork_persona", self.persona_to_worker[persona])
-            response = self.run_task(task(
+            response = await task(
                 task = 'fork_persona',
                 task_params = {
                     'persona_name': persona,
                     'maze_ipfs_hash': self.maze_ipfs_hash,
                     'curr_tile': (env[persona]['x'], env[persona]['y'])
                 }
-            ))
+            )
             response_data = json.loads(response)
             self.sims_folders[persona] = response_data['sims_folder']
             self.persona_tiles[persona] = (env[persona]['x'], env[persona]['y'])
@@ -98,42 +98,29 @@ class SimulationManager:
 
     def create_task(self, name: str, worker: str) -> NapthaTask:
         """Create a NapthaTask with common parameters."""
-        return partial(NapthaTask(
+        return NapthaTask(
             name=name,
             fn='napthaville_module',
             worker_node=worker,
             orchestrator_node=self.orchestrator_node,
             flow_run=self.flow_run
-        ))
+        )
 
-    def run_task(self, task_coroutine):
-        """Run a task coroutine and return the result."""
-        try:
-            result = task_coroutine.send(None)
-            while True:
-                try:
-                    result = task_coroutine.send(result)
-                except StopIteration as e:
-                    return e.value
-        except Exception as e:
-            logger.error(f"Error running task: {str(e)}")
-            raise
-
-    def run_simulation(self, num_steps: int):
+    async def run_simulation(self, num_steps: int):
         """Run the simulation for a specified number of steps."""
         self.num_steps = num_steps
         for step in range(self.num_steps):
             logger.info(f"Starting step {step + 1}")
-            self.process_step(step)
+            await self.process_step(step)
             self.curr_time += timedelta(seconds=self.sec_per_step)
 
         self.save_final_state()
 
-    def process_step(self, step: int):
+    async def process_step(self, step: int):
         """Process a single simulation step."""
         new_env = self.load_environment(step)
-        personas_scratch = self.get_all_persona_scratch()
-        movements = self.get_all_persona_moves(personas_scratch)
+        personas_scratch = await self.get_all_persona_scratch()
+        movements = await self.get_all_persona_moves(personas_scratch)
         self.update_environment(new_env, personas_scratch)
         self.save_movements(step, movements)
 
@@ -142,23 +129,26 @@ class SimulationManager:
         with open(f"{self.orchestrator_sims_folder}/environment/{DEFAULT_START_STEP + step}.json") as json_file:
             return json.load(json_file)
 
-    def get_all_persona_scratch(self) -> Dict[str, Dict]:
+    async def get_all_persona_scratch(self) -> Dict[str, Dict]:
         """Get scratch data for all personas."""
-        return {
-            persona: json.loads(self.run_task(self.create_task("get_scratch", self.persona_to_worker[persona])(
+        persona_scratch = {}
+        for persona in ALL_PERSONAS:
+            task = self.create_task("get_scratch", self.persona_to_worker[persona])
+            response = await task(
                 task='get_scratch',
                 task_params={
                     'persona_name': persona,
                     'sims_folder': self.sims_folders[persona]
                 }
-            )))
-            for persona in ALL_PERSONAS
-        }
+            )
+            persona_scratch[persona] = json.loads(response)
+        return persona_scratch
 
-    def get_all_persona_moves(self, personas_scratch: Dict[str, Dict]) -> Dict[str, Dict]:
+    async def get_all_persona_moves(self, personas_scratch: Dict[str, Dict]) -> Dict[str, Dict]:
         moves = {}
         for persona in ALL_PERSONAS:
-            response = self.run_task(self.create_task("get_move", self.persona_to_worker[persona])(
+            task = self.create_task("get_move", self.persona_to_worker[persona])
+            response = await task(
                 task = 'get_move',
                 task_params = {
                     'init_persona_name': persona,
@@ -168,7 +158,7 @@ class SimulationManager:
                     'curr_time': self.curr_time.strftime("%B %d, %Y, %H:%M:%S"),
                     'maze_ipfs_hash': self.maze_ipfs_hash
                 }
-            ))
+            )
             moves[persona] = json.loads(response)
             
             # Update maze_ipfs_hash if the worker has updated it
@@ -287,7 +277,7 @@ class SimulationManager:
 
         logger.info(f"Final state saved to {self.orchestrator_sims_folder}")
 
-def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: str, flow_run: Any, cfg: Dict = None):
+async def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: str, flow_run: Any, cfg: Dict = None):
     logger.info(f"Running with inputs: {inputs}")
     logger.info(f"Worker nodes: {worker_nodes}")
     logger.info(f"Orchestrator node: {orchestrator_node}")
@@ -298,7 +288,7 @@ def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: str, fl
     num_steps = inputs.num_steps
 
     sim_manager = SimulationManager(worker_nodes, orchestrator_node, flow_run, num_steps)
-    sim_manager.init_simulation()
-    sim_manager.run_simulation(num_steps)
+    await sim_manager.init_simulation()
+    await sim_manager.run_simulation(num_steps)
 
     logger.info("Simulation completed successfully")
