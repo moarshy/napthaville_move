@@ -86,9 +86,14 @@ class SimulationManager:
         for persona in ALL_PERSONAS:
             task = self.create_task("fork_persona", self.persona_to_worker[persona])
             response = await task(
-                persona_name=persona,
-                maze_ipfs_hash=self.maze_ipfs_hash,
-                curr_tile=(env[persona]['x'], env[persona]['y'])
+                {
+                    'task': 'fork_persona',
+                    'task_params': {
+                        'persona_name': persona,
+                        'maze_ipfs_hash': self.maze_ipfs_hash,
+                        'curr_tile': (env[persona]['x'], env[persona]['y'])
+                    }
+                }
             )
             response_data = json.loads(response)
             self.sims_folders[persona] = response_data['sims_folder']
@@ -139,16 +144,21 @@ class SimulationManager:
 
     async def get_all_persona_moves(self, personas_scratch: Dict[str, Dict]) -> Dict[str, Dict]:
         tasks = [self.create_task("get_move", self.persona_to_worker[persona])(
-            init_persona_name=persona,
-            sims_folder=self.sims_folders[persona],
-            personas=json.dumps(personas_scratch),
-            curr_tile=self.persona_tiles[persona],
-            curr_time=self.curr_time.strftime("%B %d, %Y, %H:%M:%S"),
-            maze_ipfs_hash=self.maze_ipfs_hash
-        ) for persona in ALL_PERSONAS]
+            {
+                'task': 'get_move',
+                'task_params': {
+                    'init_persona_name': persona,
+                    'sims_folder': self.sims_folders[persona],
+                    'personas': json.dumps(personas_scratch),
+                    'curr_tile': self.persona_tiles[persona],
+                    'curr_time': self.curr_time.strftime("%B %d, %Y, %H:%M:%S"),
+                    'maze_ipfs_hash': self.maze_ipfs_hash
+                }
+            }
+            ) for persona in ALL_PERSONAS]
         responses = await asyncio.gather(*tasks)
         moves = {persona: json.loads(response) for persona, response in zip(ALL_PERSONAS, responses)}
-        
+                
         # Update maze_ipfs_hash if any worker has updated it
         for move in moves.values():
             if 'maze_ipfs_hash' in move:
