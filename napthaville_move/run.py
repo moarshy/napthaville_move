@@ -3,7 +3,6 @@ import json
 import uuid
 import shutil
 import logging
-import asyncio
 from functools import partial
 import ipfshttpclient
 from pathlib import Path
@@ -27,7 +26,6 @@ BASE_SIMS_FOLDER = f"{os.getenv('BASE_OUTPUT_DIR')}/napthaville/step-3-3"
 DEFAULT_START_STEP = 10
 IPFS_GATEWAY_URL = os.getenv('IPFS_GATEWAY_URL')
 
-
 class SimulationManager:
     def __init__(self, worker_nodes: List[str], orchestrator_node: str, flow_run: Any, num_steps: int):
         self.worker_nodes = worker_nodes
@@ -50,16 +48,16 @@ class SimulationManager:
         return {persona: self.worker_nodes[i % len(self.worker_nodes)] 
                 for i, persona in enumerate(ALL_PERSONAS)}
 
-    async def init_simulation(self):
+    def init_simulation(self):
         """Initialize the simulation environment."""
-        self.orchestrator_sims_folder = await self.fork_sims_folder()
+        self.orchestrator_sims_folder = self.fork_sims_folder()
         env, meta = self.load_initial_state()
-        await self.init_workers(env, meta)
+        self.init_workers(env, meta)
         self.curr_time = datetime.strptime(meta['curr_time'], "%B %d, %Y, %H:%M:%S")
         self.sec_per_step = meta['sec_per_step']
         logger.info("Simulation initialization completed")
 
-    async def fork_sims_folder(self) -> str:
+    def fork_sims_folder(self) -> str:
         """Create a new simulation folder."""
         new_sims_folder = Path(os.getenv('BASE_OUTPUT_DIR', '')) / str(uuid.uuid4())
         shutil.copytree(BASE_SIMS_FOLDER, new_sims_folder, dirs_exist_ok=True)
@@ -79,13 +77,13 @@ class SimulationManager:
         
         return env, meta
 
-    async def init_workers(self, env: Dict, meta: Dict):
+    def init_workers(self, env: Dict, meta: Dict):
         maze_json = self.maze.to_json()
-        self.maze_ipfs_hash = await self.upload_maze_json_to_ipfs(maze_json)
+        self.maze_ipfs_hash = self.upload_maze_json_to_ipfs(maze_json)
         
         for persona in ALL_PERSONAS:
             task = self.create_task("fork_persona", self.persona_to_worker[persona])
-            response = await task(
+            response = task(
                     task = 'fork_persona',
                     task_params = {
                         'persona_name': persona,
@@ -108,40 +106,46 @@ class SimulationManager:
             flow_run=self.flow_run
         ))
 
-    async def run_simulation(self, num_steps: int):
+    def run_simulation(self, num_steps: int):
         """Run the simulation for a specified number of steps."""
         self.num_steps = num_steps
         for step in range(self.num_steps):
             logger.info(f"Starting step {step + 1}")
-            await self.process_step(step)
+            self.process_step(step)
             self.curr_time += timedelta(seconds=self.sec_per_step)
 
-        await self.save_final_state()
+        self.save_final_state()
 
-    async def process_step(self, step: int):
+    def process_step(self, step: int):
         """Process a single simulation step."""
         new_env = self.load_environment(step)
-        personas_scratch = await self.get_all_persona_scratch()
-        movements = await self.get_all_persona_moves(personas_scratch)
-        await self.update_environment(new_env, personas_scratch)
-        await self.save_movements(step, movements)
+        personas_scratch = self.get_all_persona_scratch()
+        movements = self.get_all_persona_moves(personas_scratch)
+        self.update_environment(new_env, personas_scratch)
+        self.save_movements(step, movements)
 
     def load_environment(self, step: int) -> Dict:
         """Load the environment state for the current step."""
         with open(f"{self.orchestrator_sims_folder}/environment/{DEFAULT_START_STEP + step}.json") as json_file:
             return json.load(json_file)
 
-    async def get_all_persona_scratch(self) -> Dict[str, Dict]:
-        """Get scratch data for all personas concurrently."""
-        tasks = [self.create_task("get_scratch", self.persona_to_worker[persona])(
-            persona_name=persona,
-            sims_folder=self.sims_folders[persona]
-        ) for persona in ALL_PERSONAS]
-        responses = await asyncio.gather(*tasks)
-        return {persona: json.loads(response) for persona, response in zip(ALL_PERSONAS, responses)}
+    def get_all_persona_scratch(self) -> Dict[str, Dict]:
+        """Get scratch data for all personas."""
+        return {
+            persona: json.loads(self.create_task("get_scratch", self.persona_to_worker[persona])(
+                task='get_scratch',
+                task_params={
+                    'persona_name': persona,
+                    'sims_folder': self.sims_folders[persona]
+                }
+            ))
+            for persona in ALL_PERSONAS
+        }
 
-    async def get_all_persona_moves(self, personas_scratch: Dict[str, Dict]) -> Dict[str, Dict]:
-        tasks = [self.create_task("get_move", self.persona_to_worker[persona])(
+    def get_all_persona_moves(self, personas_scratch: Dict[str, Dict]) -> Dict[str, Dict]:
+        moves = {}
+        for persona in ALL_PERSONAS:
+            response = self.create_task("get_move", self.persona_to_worker[persona])(
                 task = 'get_move',
                 task_params = {
                     'init_persona_name': persona,
@@ -151,23 +155,20 @@ class SimulationManager:
                     'curr_time': self.curr_time.strftime("%B %d, %Y, %H:%M:%S"),
                     'maze_ipfs_hash': self.maze_ipfs_hash
                 }
-            ) for persona in ALL_PERSONAS]
-        responses = await asyncio.gather(*tasks)
-        moves = {persona: json.loads(response) for persona, response in zip(ALL_PERSONAS, responses)}
-                
-        # Update maze_ipfs_hash if any worker has updated it
-        for move in moves.values():
-            if 'maze_ipfs_hash' in move:
-                self.maze_ipfs_hash = move['maze_ipfs_hash']
-                break
+            )
+            moves[persona] = json.loads(response)
+            
+            # Update maze_ipfs_hash if the worker has updated it
+            if 'maze_ipfs_hash' in moves[persona]:
+                self.maze_ipfs_hash = moves[persona]['maze_ipfs_hash']
         
         return moves
 
-    async def update_environment(self, new_env: Dict, personas_scratch: Dict[str, Dict]):
+    def update_environment(self, new_env: Dict, personas_scratch: Dict[str, Dict]):
         """Update the environment based on persona movements."""
         try:
             # Retrieve the current maze state from IPFS
-            maze_json = await self.retrieve_maze_json_from_ipfs(self.maze_ipfs_hash)
+            maze_json = self.retrieve_maze_json_from_ipfs(self.maze_ipfs_hash)
             maze = Maze.from_json(maze_json)
 
             for persona in ALL_PERSONAS:
@@ -184,7 +185,7 @@ class SimulationManager:
 
             # Upload the updated maze back to IPFS
             updated_maze_json = maze.to_json()
-            self.maze_ipfs_hash = await self.upload_maze_json_to_ipfs(updated_maze_json)
+            self.maze_ipfs_hash = self.upload_maze_json_to_ipfs(updated_maze_json)
 
             logger.info(f"Environment updated. New maze IPFS hash: {self.maze_ipfs_hash}")
 
@@ -206,7 +207,7 @@ class SimulationManager:
             persona_scratch['act_obj_description']
         )
 
-    async def upload_maze_json_to_ipfs(self, maze_json: Dict[str, Any]) -> str:
+    def upload_maze_json_to_ipfs(self, maze_json: Dict[str, Any]) -> str:
         try:
             with ipfshttpclient.connect(IPFS_GATEWAY_URL) as client:
                 maze_json_str = json.dumps(maze_json)
@@ -216,7 +217,7 @@ class SimulationManager:
             logger.error(f"Error uploading to IPFS: {str(e)}")
             raise
 
-    async def retrieve_maze_json_from_ipfs(self, ipfs_hash: str) -> Dict[str, Any]:
+    def retrieve_maze_json_from_ipfs(self, ipfs_hash: str) -> Dict[str, Any]:
         try:
             with ipfshttpclient.connect(IPFS_GATEWAY_URL) as client:
                 maze_json_str = client.cat(ipfs_hash)
@@ -226,7 +227,7 @@ class SimulationManager:
             logger.error(f"Error retrieving from IPFS: {str(e)}")
             raise
 
-    async def save_movements(self, step: int, movements: Dict[str, Dict]):
+    def save_movements(self, step: int, movements: Dict[str, Dict]):
         """Save the movements for the current step."""
         movements["meta"] = {"curr_time": self.curr_time.strftime("%B %d, %Y, %H:%M:%S")}
         with open(f"{self.orchestrator_sims_folder}/movement/{step}.json", "w") as outfile:
@@ -245,9 +246,9 @@ class SimulationManager:
         else:
             raise ValueError(f"Unknown node type: {node}")
 
-    async def save_final_state(self):
+    def save_final_state(self):
         """Save the final state of the simulation."""
-        maze_json = await self.retrieve_maze_json_from_ipfs(self.maze_ipfs_hash)
+        maze_json = self.retrieve_maze_json_from_ipfs(self.maze_ipfs_hash)
         with open(f"{self.orchestrator_sims_folder}/maze.json", "w") as outfile:
             json.dump(maze_json, outfile, indent=2)
         
@@ -273,7 +274,7 @@ class SimulationManager:
 
         logger.info(f"Final state saved to {self.orchestrator_sims_folder}")
 
-async def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: str, flow_run: Any, cfg: Dict = None):
+def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: str, flow_run: Any, cfg: Dict = None):
     logger.info(f"Running with inputs: {inputs}")
     logger.info(f"Worker nodes: {worker_nodes}")
     logger.info(f"Orchestrator node: {orchestrator_node}")
@@ -284,7 +285,7 @@ async def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: s
     num_steps = inputs.num_steps
 
     sim_manager = SimulationManager(worker_nodes, orchestrator_node, flow_run, num_steps)
-    await sim_manager.init_simulation()
-    await sim_manager.run_simulation(num_steps)
+    sim_manager.init_simulation()
+    sim_manager.run_simulation(num_steps)
 
     logger.info("Simulation completed successfully")
