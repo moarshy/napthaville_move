@@ -11,6 +11,7 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.12"
 pydantic = "^2.8.2"
+ipfshttpclient = "^0.7.0"
 
 [build-system]
 requires = ["poetry-core"]
