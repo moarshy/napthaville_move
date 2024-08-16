@@ -114,7 +114,7 @@ class SimulationManager:
             await self.process_step(step)
             self.curr_time += timedelta(seconds=self.sec_per_step)
 
-        self.save_final_state()
+        return self.save_final_state()
 
     async def process_step(self, step: int):
         """Process a single simulation step."""
@@ -277,6 +277,8 @@ class SimulationManager:
 
         logger.info(f"Final state saved to {self.orchestrator_sims_folder}")
 
+        return folder_info
+
 async def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: str, flow_run: Any, cfg: Dict = None):
     logger.info(f"Running with inputs: {inputs}")
     logger.info(f"Worker nodes: {worker_nodes}")
@@ -289,6 +291,8 @@ async def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: s
 
     sim_manager = SimulationManager(worker_nodes, orchestrator_node, flow_run, num_steps)
     await sim_manager.init_simulation()
-    await sim_manager.run_simulation(num_steps)
+    folder_info = await sim_manager.run_simulation(num_steps)
 
     logger.info("Simulation completed successfully")
+
+    return folder_info
