@@ -210,7 +210,7 @@ class SimulationManager:
             reaction_mode_data = json.loads(reaction_mode_response)
             logger.info(f"reaction_mode_data: {reaction_mode_data}")
             reaction_mode = reaction_mode_data['reaction_mode']
-            focused_event = reaction_mode_data['focuesed_event']
+            focused_event = reaction_mode_data['focused_event']
 
             # (3) next step based on reaction_mode
             if reaction_mode:
