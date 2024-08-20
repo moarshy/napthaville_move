@@ -230,7 +230,7 @@ class SimulationManager:
             # (4) reflect and execute
             reflect_execute_task = self.create_task("reflect_execute", self.persona_to_worker[persona])
             reflect_execute_response = await reflect_execute_task(
-                task = 'reflect_execute',
+                task = 'get_reflect_execute',
                 task_params = {
                     'init_persona_name': persona,
                     'sims_folder': self.sims_folders[persona],
