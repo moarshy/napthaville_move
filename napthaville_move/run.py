@@ -232,7 +232,7 @@ class SimulationManager:
             reflect_execute_response = await reflect_execute_task(
                 task = 'reflect_execute',
                 task_params = {
-                    'persona_name': persona,
+                    'init_persona_name': persona,
                     'sims_folder': self.sims_folders[persona],
                     'persona_plan': persona_plan,
                     'personas_curr_tiles': self.persona_tiles,
