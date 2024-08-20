@@ -234,7 +234,6 @@ class SimulationManager:
                 task_params = {
                     'init_persona_name': persona,
                     'sims_folder': self.sims_folders[persona],
-                    'persona_plan': persona_plan,
                     'personas_curr_tiles': self.persona_tiles,
                     'plan': persona_plan,
                     'maze_ipfs_hash': self.maze_ipfs_hash
@@ -258,7 +257,7 @@ class SimulationManager:
         complete_plan_response = await complete_plan_task(
             task="get_complete_plan_no_reaction",
             task_params={
-                'persona_name': persona,
+                'init_persona_name': persona,
                 'sims_folder': self.sims_folders[persona],
             }
         )
@@ -301,7 +300,7 @@ class SimulationManager:
         init_persona_info = await init_persona_info_task(
         task='get_personal_info', 
         task_params={
-            'persona_name': init_persona_name,
+            'init_persona_name': init_persona_name,
             'sims_folder': self.sims_folders['init_persona_name']
 
         })
@@ -382,7 +381,7 @@ class SimulationManager:
             task="get_complete_plan",
             task_params={
                 'all_utt': all_utt,
-                'persona_name': init_persona_name,
+                'init_persona_name': init_persona_name,
                 'sims_folder': self.sims_folders[init_persona_name],
                 'target_persona_scratch': target_persona_scratch,
                 'maze_ipfs_hash': self.maze_ipfs_hash,
