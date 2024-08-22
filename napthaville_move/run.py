@@ -138,7 +138,7 @@ class SimulationManager:
         """Process a single simulation step."""
         logger.info(f"Processing step {self.step}")
         new_env = self.load_environment()
-        self.personas_scratch = self.get_all_persona_scratch()
+        self.personas_scratch = await self.get_all_persona_scratch()
         movements = await self.get_all_person_moves_v2(self.personas_scratch)
         logger.info(f"Movements: {movements}")
         self.personas_scratch = self.get_all_persona_scratch()
