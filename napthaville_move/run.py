@@ -41,7 +41,7 @@ class SimulationManager:
         self.num_steps: int = num_steps
         self.step: int
         self.maze_ipfs_hash: str = ""
-        logger.info(f"Initializing simulation manager with {self.num_steps} steps. Start step: {self.start_step}")
+        logger.info(f"Initializing simulation manager with {self.num_steps} steps.")
         logger.info(f"Persona to worker: {self.persona_to_worker}")
 
     def _assign_personas_to_workers(self) -> Dict[str, str]:
