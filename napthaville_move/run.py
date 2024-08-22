@@ -538,7 +538,7 @@ async def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: s
 
     sim_manager = SimulationManager(worker_nodes, orchestrator_node, flow_run, num_steps)
     await sim_manager.init_simulation()
-    folder_info = await sim_manager.run_simulation(num_steps)
+    folder_info = await sim_manager.run_simulation()
 
     logger.info("Simulation completed successfully")
 
