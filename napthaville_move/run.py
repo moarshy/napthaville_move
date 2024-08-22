@@ -27,7 +27,7 @@ BASE_SIMS_FOLDER = f"{os.getenv('BASE_OUTPUT_DIR')}/napthaville/step-3-3"
 IPFS_GATEWAY_URL = os.getenv('IPFS_GATEWAY_URL')
 
 class SimulationManager:
-    def __init__(self, worker_nodes: List[str], orchestrator_node: str, flow_run: Any, num_steps: int, start_step: int):
+    def __init__(self, worker_nodes: List[str], orchestrator_node: str, flow_run: Any, num_steps: int):
         self.worker_nodes = worker_nodes
         self.orchestrator_node = orchestrator_node
         self.flow_run = flow_run
@@ -39,7 +39,7 @@ class SimulationManager:
         self.curr_time: datetime
         self.sec_per_step: int
         self.num_steps: int = num_steps
-        self.start_step: int = start_step
+        self.step: int
         self.maze_ipfs_hash: str = ""
         logger.info(f"Initializing simulation manager with {self.num_steps} steps. Start step: {self.start_step}")
         logger.info(f"Persona to worker: {self.persona_to_worker}")
@@ -52,10 +52,8 @@ class SimulationManager:
     async def init_simulation(self):
         """Initialize the simulation environment."""
         self.orchestrator_sims_folder = self.fork_sims_folder()
-        env, meta = self.load_initial_state()
+        env = self.load_initial_state()
         await self.init_workers(env)
-        self.curr_time = datetime.strptime(meta['curr_time'], "%B %d, %Y, %H:%M:%S")
-        self.sec_per_step = meta['sec_per_step']
         logger.info("Simulation initialization completed")
 
     def fork_sims_folder(self) -> str:
@@ -66,17 +64,20 @@ class SimulationManager:
 
     def load_initial_state(self) -> Tuple[Dict, Dict]:
         """Load initial environment and metadata."""
-        with open(f"{self.orchestrator_sims_folder}/environment/{self.start_step}.json", 'r') as f:
-            env = json.load(f)
+        logger.info("Loading initial state")
         with open(f"{self.orchestrator_sims_folder}/reverie/meta.json", 'r') as f:
             meta = json.load(f)
-        
-        # Set the start_time and curr_time from the meta data
+
         self.start_time = datetime.strptime(f"{meta['start_date']}, 00:00:00",  "%B %d, %Y, %H:%M:%S")
         self.curr_time = datetime.strptime(meta['curr_time'], "%B %d, %Y, %H:%M:%S")
         self.sec_per_step = meta['sec_per_step']
-        
-        return env, meta
+        self.step = meta['step']        
+        logger.info(f"Initial state loaded. Start time: {self.start_time}, Current time: {self.curr_time}")
+
+        with open(f"{self.orchestrator_sims_folder}/environment/{self.step}.json", 'r') as f:
+            env = json.load(f)
+        logger.info(f"Environment loaded for step {self.step}")
+        return env
 
     async def init_workers(self, env: Dict):
         """Initialize the workers."""
@@ -108,32 +109,54 @@ class SimulationManager:
             flow_run=self.flow_run
         )
 
-    async def run_simulation(self, num_steps: int):
+    async def run_simulation(self):
         """Run the simulation for a specified number of steps."""
-        self.num_steps = num_steps
+        logger.info(f"Starting simulation for {self.num_steps} steps")
         for step in range(self.num_steps):
-            logger.info(f"Starting step {step + 1}")
-            await self.process_step(step + self.start_step)
-            self.curr_time += timedelta(seconds=self.sec_per_step)
+            logger.info(f"Processing step {step + 1} of {self.num_steps}")
+            await self.process_step()
+            logger.info(f"Step {step + 1} completed. Current time: {self.curr_time}")
 
         return self.save_final_state()
 
-    async def process_step(self, step: int):
-        """Process a single simulation step."""
-        new_env = self.load_environment(step)
-        personas_scratch = await self.get_all_persona_scratch()
-        movements = await self.get_all_person_moves_v2(personas_scratch)
-        personas_scratch = await self.get_all_persona_scratch()
-        self.update_environment(new_env, personas_scratch)
-        self.save_movements(step, movements)
+    def save_environment(self, step: int, movements: Dict[str, List]):
+        """Save the environment state for the current step."""
+        logger.info(f"Saving environment for step {step}")
+        new_env = {}
+        for persona, data in movements.items():
+            new_env[persona] = {
+                'maze': 'the_ville',
+                'x': data[0][0],
+                'y': data[0][1]
+            }
 
-    def load_environment(self, step: int) -> Dict:
+        with open(f"{self.orchestrator_sims_folder}/environment/{step}.json", "w") as outfile:
+            json.dump(new_env, outfile, indent=2)
+        logger.info(f"Environment saved for step {step}")
+
+    async def process_step(self):
+        """Process a single simulation step."""
+        logger.info(f"Processing step {self.step}")
+        new_env = self.load_environment()
+        self.personas_scratch = self.get_all_persona_scratch()
+        movements = await self.get_all_person_moves_v2(self.personas_scratch)
+        logger.info(f"Movements: {movements}")
+        self.personas_scratch = self.get_all_persona_scratch()
+        self.update_environment(new_env, self.personas_scratch)
+        self.save_movements(self.step, movements)
+        self.step += 1
+        self.curr_time += timedelta(seconds=self.sec_per_step)
+        self.save_environment(self.step, movements)
+        logger.info(f"Step {self.step} processing completed")
+
+    def load_environment(self) -> Dict:
         """Load the environment state for the current step."""
-        with open(f"{self.orchestrator_sims_folder}/environment/{self.start_step + step}.json") as json_file:
+        with open(f"{self.orchestrator_sims_folder}/environment/{self.step}.json") as json_file:
             return json.load(json_file)
 
     async def get_all_persona_scratch(self) -> Dict[str, Dict]:
         """Get scratch data for all personas."""
+        logger.info("Fetching scratch data for all personas")
         persona_scratch = {}
         for persona in ALL_PERSONAS:
             task = self.create_task("get_scratch", self.persona_to_worker[persona])
@@ -215,15 +238,15 @@ class SimulationManager:
             # (3) next step based on reaction_mode
             if reaction_mode:
                 if reaction_mode[:9] == "chat with":
-                    logger.info(f"chat with {reaction_mode[9:]}")   
+                    logger.info(f"{persona} will chat with {reaction_mode[9:]}")   
                     persona_plan = await self.chat_react_plan(persona, reaction_mode)
                     logger.info(f"persona_plan: {persona_plan}")
                 elif reaction_mode[:4] == "wait":
-                    logger.info(f"wait {reaction_mode[5:]}")
+                    logger.info(f"{persona} will wait {reaction_mode[5:]}")
                     persona_plan = await self.wait_react_plan(persona, reaction_mode)
                     logger.info(f"persona_plan: {persona_plan}")
             else:
-                logger.info(f"no reaction")
+                logger.info(f"No reaction for {persona}")
                 persona_plan = await self.no_reaction_plan(persona)
                 logger.info(f"persona_plan: {persona_plan}")
     
@@ -244,11 +267,12 @@ class SimulationManager:
             moves[persona] = reflect_execute_response['execution']
             self.maze_ipfs_hash = reflect_execute_response['maze_ipfs_hash']
 
+        logger.info("Completed get_all_person_moves_v2")
         return moves
 
     async def no_reaction_plan(self, persona):
         complete_plan_task = NapthaTask(
-            name = 'get_complete_plan',
+            name = 'get_complete_plan_no_reaction',
             fn = 'napthaville_module',
             worker_node = self.persona_to_worker[persona],
             orchestrator_node = self.orchestrator_node,
@@ -263,7 +287,6 @@ class SimulationManager:
         )
         return json.loads(complete_plan_response)
         
-
     async def wait_react_plan(self, persona, reaction_mode):
         wait_react_task = self.create_task("wait_react", self.persona_to_worker[persona])
         wait_react_response = await wait_react_task(
@@ -390,8 +413,6 @@ class SimulationManager:
         )
 
         return json.loads(complete_plan_response)
-
-
     
     def update_environment(self, new_env: Dict, personas_scratch: Dict[str, Dict]):
         """Update the environment based on persona movements."""
@@ -513,10 +534,9 @@ async def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: s
     if len(worker_nodes) < 1:
         raise ValueError("There should be at least 1 worker node available")
     
-    start_step = inputs.start_step
     num_steps = inputs.num_steps
 
-    sim_manager = SimulationManager(worker_nodes, orchestrator_node, flow_run, num_steps, start_step)
+    sim_manager = SimulationManager(worker_nodes, orchestrator_node, flow_run, num_steps)
     await sim_manager.init_simulation()
     folder_info = await sim_manager.run_simulation(num_steps)
 
