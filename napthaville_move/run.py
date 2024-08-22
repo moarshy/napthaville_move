@@ -478,9 +478,30 @@ class SimulationManager:
 
     def save_movements(self, step: int, movements: Dict[str, Dict]):
         """Save the movements for the current step."""
-        movements["meta"] = {"curr_time": self.curr_time.strftime("%B %d, %Y, %H:%M:%S")}
+        logger.info(f"Saving movements for step {step}")
+
+        
+        formatted_movements = {
+            "persona": {},
+            "meta": {
+                "curr_time": self.curr_time.strftime("%B %d, %Y, %H:%M:%S")
+            }
+        }
+
+        for persona, data in movements.items():
+            logger.info(f"persona: {persona}")
+            logger.info(f"data: {data}")
+            formatted_movements["persona"][persona] = {
+                "movement": data[0],
+                "pronunciation": data[1],
+                "description": data[2],
+                "chat": self.personas_scratch[persona]['chat']
+                }
+
         with open(f"{self.orchestrator_sims_folder}/movement/{step}.json", "w") as outfile:
-            json.dump(movements, outfile, indent=2)
+            json.dump(formatted_movements, outfile, indent=2)
+        
+        logger.info(f"Movements saved for step {step}")
 
     def _serialize_node(self, node: Any) -> Dict[str, Any]:
         """Serialize a node object into a dictionary."""
