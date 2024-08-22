@@ -116,7 +116,6 @@ class SimulationManager:
             logger.info(f"Processing step {step + 1} of {self.num_steps}")
             await self.process_step()
             logger.info(f"Step {step + 1} completed. Current time: {self.curr_time}")
-
         return self.save_final_state()
 
     def save_environment(self, step: int, movements: Dict[str, List]):
@@ -141,7 +140,7 @@ class SimulationManager:
         self.personas_scratch = await self.get_all_persona_scratch()
         movements = await self.get_all_person_moves_v2(self.personas_scratch)
         logger.info(f"Movements: {movements}")
-        self.personas_scratch = self.get_all_persona_scratch()
+        self.personas_scratch = await self.get_all_persona_scratch()
         self.update_environment(new_env, self.personas_scratch)
         self.save_movements(self.step, movements)
         self.step += 1
