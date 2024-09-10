@@ -155,7 +155,7 @@ class SimulationManager:
         """Initialize the workers."""
         logger.info("Initializing workers")
         maze_json = self.maze.to_json()
-        self.maze_ipfs_hash = upload_json_file_to_ipfs(maze_json)
+        self.maze_ipfs_hash = upload_maze_json_to_ipfs(maze_json)
         
         for persona in self.all_personas:
             task = self.create_task("fork_persona", self.personas_to_workers[persona])
