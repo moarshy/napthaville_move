@@ -6,7 +6,7 @@ import backoff
 import ipfshttpclient
 from typing import Dict, Any
 from requests.exceptions import ConnectionError, ReadTimeout
-from naptha_sdk.client import Node
+from naptha_sdk.client.node import Node
 
 IPFS_GATEWAY_URL = os.getenv("IPFS_GATEWAY_URL", None)
 BASE_OUTPUT_DIR = os.getenv("BASE_OUTPUT_DIR", None)
