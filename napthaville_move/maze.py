@@ -9,13 +9,6 @@ world in a 2-dimensional matrix.
 import json
 import math
 import csv
-from pathlib import Path
-
-
-file_path = Path(__file__).resolve()
-root_path = file_path.parent
-ENV_MATRIX = f"{root_path}/the_ville/matrix"
-
 
 def read_file_to_list(curr_file, header=False, strip_trail=True):
     """
@@ -47,12 +40,12 @@ def read_file_to_list(curr_file, header=False, strip_trail=True):
 
 
 class Maze:
-    def __init__(self, maze_name):
+    def __init__(self, maze_name, maze_folder):
         # READING IN THE BASIC META INFORMATION ABOUT THE MAP
         self.maze_name = maze_name
         # Reading in the meta information about the world. If you want tp see the
         # example variables, check out the maze_meta_info.json file.
-        meta_info = json.load(open(f"{ENV_MATRIX}/maze_meta_info.json"))
+        meta_info = json.load(open(f"{maze_folder}/maze_meta_info.json"))
         # <maze_width> and <maze_height> denote the number of tiles make up the
         # height and width of the map.
         self.maze_width = int(meta_info["maze_width"])
@@ -76,7 +69,7 @@ class Maze:
         # Tiled export. Then we basically have the block path:
         # World, Sector, Arena, Game Object -- again, these paths need to be
         # unique within an instance of Reverie.
-        blocks_folder = f"{ENV_MATRIX}/special_blocks"
+        blocks_folder = f"{maze_folder}/special_blocks"
 
         _wb = blocks_folder + "/world_blocks.csv"
         wb_rows = read_file_to_list(_wb, header=False)
@@ -109,7 +102,7 @@ class Maze:
         # [SECTION 3] Reading in the matrices
         # This is your typical two dimensional matrices. It's made up of 0s and
         # the number that represents the color block from the blocks folder.
-        maze_folder = f"{ENV_MATRIX}/maze"
+        maze_folder = f"{maze_folder}/maze"
 
         _cm = maze_folder + "/collision_maze.csv"
         collision_maze_raw = read_file_to_list(_cm, header=False)[0]
@@ -431,7 +424,9 @@ class Maze:
                         "game_object": tile["game_object"],
                         "spawning_location": tile["spawning_location"],
                         "collision": tile["collision"],
-                        "events": list(tile["events"])  # Convert set to list for JSON serialization
+                        "events": list(
+                            tile["events"]
+                        ),  # Convert set to list for JSON serialization
                     }
                     for tile in row
                 ]
@@ -440,22 +435,21 @@ class Maze:
             "address_tiles": {
                 key: list(value)  # Convert set to list for JSON serialization
                 for key, value in self.address_tiles.items()
-            }
+            },
         }
         return json.dumps(serialized_data)
-    
 
     @classmethod
-    def from_json(cls, json_string):
+    def from_json(cls, json_string, maze_folder):
         data = json.loads(json_string)
-        maze = cls(data["maze_name"])
-        
+        maze = cls(data["maze_name"], maze_folder)
+
         maze.maze_width = data["maze_width"]
         maze.maze_height = data["maze_height"]
         maze.sq_tile_size = data["sq_tile_size"]
         maze.special_constraint = data["special_constraint"]
         maze.collision_maze = data["collision_maze"]
-        
+
         maze.tiles = [
             [
                 {
@@ -465,16 +459,18 @@ class Maze:
                     "game_object": tile["game_object"],
                     "spawning_location": tile["spawning_location"],
                     "collision": tile["collision"],
-                    "events": set(tuple(event) for event in tile["events"])  # Convert list back to set
+                    "events": set(
+                        tuple(event) for event in tile["events"]
+                    ),  # Convert list back to set
                 }
                 for tile in row
             ]
             for row in data["tiles"]
         ]
-        
+
         maze.address_tiles = {
             key: set(tuple(coord) for coord in value)  # Convert list back to set
             for key, value in data["address_tiles"].items()
         }
-        
+
         return maze
