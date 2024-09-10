@@ -6,6 +6,7 @@ import backoff
 import ipfshttpclient
 from typing import Dict, Any
 from requests.exceptions import ConnectionError, ReadTimeout
+from naptha_sdk.client import Node
 
 IPFS_GATEWAY_URL = os.getenv("IPFS_GATEWAY_URL", None)
 BASE_OUTPUT_DIR = os.getenv("BASE_OUTPUT_DIR", None)
@@ -169,6 +170,27 @@ def upload_json_file_to_ipfs(file_path: str):
         print(f"Error getting persona folder: {str(e)}")
         raise
 
+
+def serialize_personas_to_workers(personas_to_workers: Dict[str, Node]) -> str:
+    serialized_dict = {}
+    for persona, node in personas_to_workers.items():
+        serialized_dict[persona] = {
+            "node_url": node.node_url if node.node_url else None,
+            "indirect_node_id": node.indirect_node_id if node.indirect_node_id else None,
+            "routing_url": node.routing_url if node.routing_url else None
+        }
+    return json.dumps(serialized_dict)
+
+def deserialize_personas_to_workers(serialized_data: str) -> Dict[str, Node]:
+    deserialized_dict = json.loads(serialized_data)
+    personas_to_workers = {}
+    for persona, node_data in deserialized_dict.items():
+        personas_to_workers[persona] = Node(
+            node_url=node_data.get("node_url", None),
+            indirect_node_id=node_data.get("indirect_node_id", None),
+            routing_url=node_data.get("routing_url", None)
+        )
+    return personas_to_workers
 
 if not os.path.exists(MAZE_FOLDER):
     get_folder_from_ipfs(BASE_MAZE_IPFS_HASH, f"{BASE_OUTPUT_DIR}/maze")

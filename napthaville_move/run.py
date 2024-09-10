@@ -15,7 +15,9 @@ from napthaville_move.utils import (
     get_folder_from_ipfs,
     retrieve_json_from_ipfs,
     upload_json_file_to_ipfs,
-    upload_maze_json_to_ipfs
+    upload_maze_json_to_ipfs,
+    serialize_personas_to_workers,
+    deserialize_personas_to_workers
 )
 from naptha_sdk.task import Task as NapthaTask
 
@@ -77,7 +79,7 @@ class SimulationManager:
             raise ValueError("orchestrator_sims_folder is not set")
         
         self.all_personas = simulation_info["personas"]
-        self.personas_to_workers = simulation_info["personas_to_workers"]
+        self.personas_to_workers = deserialize_personas_to_workers(simulation_info["personas_to_workers"])
         self.sims_folders = simulation_info["sims_folders"]
         self.num_steps = simulation_info["num_steps"]
         self.start_time = datetime.strptime(
@@ -212,7 +214,7 @@ class SimulationManager:
             "sims_folders": self.sims_folders,
             "maze_ipfs_hash": self.maze_ipfs_hash,
             "current_step": self.step,
-            "personas_to_workers": self.personas_to_workers,
+            "personas_to_workers": serialize_personas_to_workers(self.personas_to_workers),
             "persona_tiles": self.persona_tiles,
         }
         with open(
