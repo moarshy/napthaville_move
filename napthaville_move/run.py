@@ -655,7 +655,7 @@ async def run(inputs: InputSchema, worker_nodes: List[str], orchestrator_node: s
         num_steps,
         sims_ipfs_hash,
     )
-    if sims_ipfs_hash:
+    if not sims_ipfs_hash:
         await sim_manager.init_simulation()
     folder_info, sims_ipfs_hash = await sim_manager.run_simulation()
 
