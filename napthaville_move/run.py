@@ -11,6 +11,7 @@ from napthaville_move.utils import (
     setup_logging, 
     BASE_MAZE_IPFS_HASH, 
     BASE_OUTPUT_DIR,
+    MAZE_FOLDER,
     get_folder_from_ipfs,
     retrieve_json_from_ipfs,
     upload_json_file_to_ipfs,
@@ -544,7 +545,7 @@ class SimulationManager:
         try:
             # Retrieve the current maze state from IPFS
             maze_json = retrieve_json_from_ipfs(self.maze_ipfs_hash)
-            maze = Maze.from_json(maze_json)
+            maze = Maze.from_json(maze_json, maze_folder=MAZE_FOLDER)
 
             for persona in self.all_personas:
                 curr_tile = self.persona_tiles[persona]
