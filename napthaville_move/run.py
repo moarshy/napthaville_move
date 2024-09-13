@@ -2,13 +2,11 @@ import os
 import json
 import math
 import uuid
-import logging
 from typing import Dict, List, Any, Tuple, Optional
 from datetime import datetime, timedelta
 from napthaville_move.schemas import InputSchema
 from napthaville_move.maze import Maze
 from napthaville_move.utils import (
-    setup_logging, 
     BASE_MAZE_IPFS_HASH, 
     BASE_OUTPUT_DIR,
     MAZE_FOLDER,
@@ -20,10 +18,10 @@ from napthaville_move.utils import (
     deserialize_personas_to_workers
 )
 from naptha_sdk.task import Task as NapthaTask
+from naptha_sdk.utils import get_logger
 
 # Configure logging
-setup_logging()
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 PERSONAS = {
     "Mark Schmidt": "QmXJBcUiMAg7CfNSaYyNH8Ap1hh15chVwPepGbiRckkSxe",
