@@ -508,6 +508,7 @@ class SimulationManager:
                 'sims_folder': self.sims_folders[target_persona_name]
             }
         )
+        target_persona_scratch = json.loads(target_persona_scratch)
 
         complete_plan_task = self.create_task("get_complete_plan_chat", init_persona_node)
 
