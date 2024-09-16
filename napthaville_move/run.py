@@ -425,7 +425,7 @@ class SimulationManager:
         wait_react_response = await wait_react_task(
             task = 'get_complete_plan_wait',
             task_params = {
-                'persona_name': persona,
+                'init_persona_name': persona,
                 'sims_folder': self.sims_folders[persona],
                 'reaction_mode': reaction_mode
             }
