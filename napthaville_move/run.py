@@ -509,10 +509,10 @@ class SimulationManager:
             }
         )
 
-        complete_plan_task = self.create_task("get_complete_plan", init_persona_node)
+        complete_plan_task = self.create_task("get_complete_plan_chat", init_persona_node)
 
         complete_plan_response = await complete_plan_task(
-            task="get_complete_plan",
+            task="get_complete_plan_chat",
             task_params={
                 'all_utt': all_utt,
                 'init_persona_name': init_persona_name,
